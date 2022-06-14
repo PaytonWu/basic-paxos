@@ -1,32 +1,30 @@
 ﻿using System.Net;
 using System.Net.Sockets;
 
-namespace BasicPaxosNet
+namespace BasicPaxosCore
 {
-    class NetworkDriver
+    internal class NetworkDriver
     {
-        private const Int32 serviceNumber = 8888;
+        private const Int32 ServiceNumber = 8888;
 
-        private ICollection<IPAddress> peers;
-        private readonly UdpClient self;
+        private ICollection<IPAddress> _peers;
+        private readonly UdpClient _self;
 
         public NetworkDriver(IPAddress localAddress)
         {
-            self = new UdpClient(new IPEndPoint(localAddress, ServiceNumber));
-            peers = new List<IPAddress>();
+            _self = new UdpClient(new IPEndPoint(localAddress, ServiceNumber));
+            _peers = new List<IPAddress>();
         }
-
-        public static Int32 ServiceNumber => serviceNumber;
 
         public void SendTo(Message message, IPAddress peer)
         {
-            self.Send(message.Serialize(), new IPEndPoint(peer, ServiceNumber));
+            _self.Send(message.Serialize(), new IPEndPoint(peer, ServiceNumber));
         }
 
         public Byte[] Receive()
         {
             IPEndPoint? remote = null;
-            return self.Receive(ref remote);
+            return _self.Receive(ref remote);
         }
     }
 }
