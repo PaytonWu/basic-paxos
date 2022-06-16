@@ -1,8 +1,9 @@
 ﻿using System.Diagnostics;
 using System.Net;
-using BasicPaxosCore;
 
-class Proposer
+namespace BasicPaxosCore;
+
+internal class Proposer
 {
     public Proposer(IPAddress ipAddress, Int32 id, IPAddress[] peerAddresses)
     {

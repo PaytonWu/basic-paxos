@@ -1,6 +1,8 @@
 ﻿using System.Diagnostics;
 using System.Diagnostics.CodeAnalysis;
 
+namespace BasicPaxosCore;
+
 public enum MessageType : Byte
 {
     Invalid = 0,
