@@ -33,7 +33,7 @@ internal class Proposer
         ProposalId = Round << 16 | Id;
 
         var messageProposal = new MessageProposal(ProposalId, Id, value);
-        var message = new Message(MessageType.Propose, messageProposal.Serialize());
+        var message = new Message(MessageType.Prepare, messageProposal.Serialize());
         Int32 prepareCount = 0;
         foreach (var peerAddress in PeerAddresses)
         {

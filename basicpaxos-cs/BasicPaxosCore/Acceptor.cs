@@ -40,12 +40,16 @@ internal class Acceptor
 
         switch (message.Type)
         {
+            case MessageType.Prepare:
+            {
+                var prepare = MessagePrepare.Deserialize(bytes);
+                break;
+            }
             case MessageType.Proposal:
             {
                 var proposal = MessageProposal.Deserialize(bytes);
                 break;
             }
-
         }
     }
 
