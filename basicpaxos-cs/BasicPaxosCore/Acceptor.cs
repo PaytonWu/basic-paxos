@@ -43,17 +43,37 @@ internal class Acceptor
             case MessageType.Prepare:
             {
                 var prepare = MessagePrepare.Deserialize(bytes);
+                OnPrepare(prepare);
                 break;
             }
-            case MessageType.Proposal:
+            case MessageType.Propose:
             {
-                var proposal = MessageProposal.Deserialize(bytes);
+                var propose = MessagePropose.Deserialize(bytes);
+                OnPropose(propose);
                 break;
             }
         }
     }
 
-    private void OnPrepare(MessageProposal prepare)
+    private void OnPrepare(MessagePrepare prepare)
+    {
+        if (AcceptedProposalId.HasValue)
+        {
+            if (prepare.ProposalId <= AcceptedProposalId)
+            {
+                var messagePromise = AcceptedValue.HasValue
+                    ? new MessagePromise(true, AcceptedProposalId.Value, AcceptedValue.Value)
+                    : new MessagePromise(true, AcceptedProposalId.Value);
+                // NetworkDriver.SendTo();
+            }
+        }
+        else
+        {
+            MinProposalId = prepare.ProposalId;
+        }
+    }
+
+    private void OnPropose(MessagePropose propose)
     {
 
     }

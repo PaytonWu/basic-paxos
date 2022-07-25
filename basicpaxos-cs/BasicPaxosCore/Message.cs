@@ -7,11 +7,12 @@ public enum MessageType : Byte
 {
     Invalid = 0,
     Prepare,
-    Proposal,
-    Vote
+    Propose,
+    Promise,
+    Accepted
 }
 
-[Serializable]
+// [Serializable]
 internal class Message
 {
     public Message(MessageType type, [DisallowNull] Byte[] payload)
@@ -51,7 +52,6 @@ class MessagePrepare
 {
     public Int32 ProposalId { get; internal set; }
     public Int32 From { get; internal set; }
-    public MessageType Type => MessageType.Prepare;
 
     internal MessagePrepare(Int32 proposalId, Int32 from)
     {
@@ -80,15 +80,15 @@ class MessagePrepare
     }
 }
 
-class MessageProposal
+class MessagePropose
 {
     public Int32 ProposalId { get; internal set; }
     public Int32 From { get; private set; }
     public Int32 Value { get; private set; }
 
-    public MessageType Type => MessageType.Proposal;
+    public MessageType Type => MessageType.Propose;
 
-    internal MessageProposal(Int32 proposalId, Int32 from, Int32 value)
+    internal MessagePropose(Int32 proposalId, Int32 from, Int32 value)
     {
         ProposalId = proposalId;
         From = from;
@@ -105,11 +105,11 @@ class MessageProposal
         return bytes.ToArray();
     }
 
-    internal static MessageProposal Deserialize([DisallowNull] Byte[] bytes)
+    internal static MessagePropose Deserialize([DisallowNull] Byte[] bytes)
     {
         if (bytes.Length == 12)
         {
-            return new MessageProposal(BitConverter.ToInt32(bytes, 0), BitConverter.ToInt32(bytes, 4),
+            return new MessagePropose(BitConverter.ToInt32(bytes, 0), BitConverter.ToInt32(bytes, 4),
                 BitConverter.ToInt32(bytes, 8));
         }
 
@@ -118,20 +118,20 @@ class MessageProposal
     }
 }
 
-class MessageVote
+class MessagePromise
 {
     public Boolean Ok { get; private set; }
     public Int32 ProposalId { get; private set; }
     public Int32? Value { get; private set; }
 
-    public MessageVote(Boolean ok, Int32 proposalId, Int32 value)
+    public MessagePromise(Boolean ok, Int32 proposalId, Int32 value)
     {
         Ok = ok;
         ProposalId = proposalId;
         Value = value;
     }
 
-    public MessageVote(Boolean ok, Int32 proposalId)
+    public MessagePromise(Boolean ok, Int32 proposalId)
     {
         Ok = ok;
         ProposalId = proposalId;
@@ -150,7 +150,7 @@ class MessageVote
         return bytes.ToArray();
     }
 
-    internal static MessageVote Deserialize([DisallowNull] Byte[] bytes)
+    internal static MessagePromise Deserialize([DisallowNull] Byte[] bytes)
     {
         if (bytes.Length < 5)
         {
@@ -160,10 +160,64 @@ class MessageVote
         switch (bytes.Length)
         {
             case 5:
-                return new MessageVote(BitConverter.ToBoolean(bytes, 0), BitConverter.ToInt32(bytes, 1));
+                return new MessagePromise(BitConverter.ToBoolean(bytes, 0), BitConverter.ToInt32(bytes, 1));
 
             case 9:
-                return new MessageVote(BitConverter.ToBoolean(bytes, 0), BitConverter.ToInt32(bytes, 1), BitConverter.ToInt32(bytes, 5));
+                return new MessagePromise(BitConverter.ToBoolean(bytes, 0), BitConverter.ToInt32(bytes, 1), BitConverter.ToInt32(bytes, 5));
+
+            default:
+                Debug.Assert(false);
+                throw new ArgumentException("Input bytes length invalid");
+        }
+    }
+}
+
+class MessageAccepted
+{
+    public Boolean Ok { get; private set; }
+    public Int32 ProposalId { get; private set; }
+    public Int32? Value { get; private set; }
+
+    public MessageAccepted(Boolean ok, Int32 proposalId, Int32 value)
+    {
+        Ok = ok;
+        ProposalId = proposalId;
+        Value = value;
+    }
+
+    public MessageAccepted(Boolean ok, Int32 proposalId)
+    {
+        Ok = ok;
+        ProposalId = proposalId;
+    }
+
+    internal Byte[] Serialize()
+    {
+        ICollection<Byte> bytes = new List<Byte>();
+        bytes.Concat(BitConverter.GetBytes(Ok));
+        bytes.Concat(BitConverter.GetBytes(ProposalId));
+        if (Value.HasValue)
+        {
+            bytes.Concat(BitConverter.GetBytes(Value.Value));
+        }
+
+        return bytes.ToArray();
+    }
+
+    internal static MessageAccepted Deserialize([DisallowNull] Byte[] bytes)
+    {
+        if (bytes.Length < 5)
+        {
+            throw new ArgumentException("Input bytes too short");
+        }
+
+        switch (bytes.Length)
+        {
+            case 5:
+                return new MessageAccepted(BitConverter.ToBoolean(bytes, 0), BitConverter.ToInt32(bytes, 1));
+
+            case 9:
+                return new MessageAccepted(BitConverter.ToBoolean(bytes, 0), BitConverter.ToInt32(bytes, 1), BitConverter.ToInt32(bytes, 5));
 
             default:
                 Debug.Assert(false);

@@ -27,14 +27,14 @@ internal class Proposer
         return PeerAddresses.Length / 2 + 1;
     }
 
-    void Prepare(Int32 value)
+    Int32? Propose(Int32 value)
     {
         Round++;
         ProposalId = Round << 16 | Id;
 
-        var messageProposal = new MessageProposal(ProposalId, Id, value);
-        var message = new Message(MessageType.Prepare, messageProposal.Serialize());
-        Int32 prepareCount = 0;
+        var messagePrepare = new MessagePrepare(ProposalId, Id);
+        var message = new Message(MessageType.Prepare, messagePrepare.Serialize());
+        Int32 promisedCount = 0;
         foreach (var peerAddress in PeerAddresses)
         {
             NetworkDriver.SendTo(message, peerAddress);
@@ -42,12 +42,12 @@ internal class Proposer
 
             try
             {
-                var reply = MessageVote.Deserialize(replyBytes);
+                var reply = MessagePromise.Deserialize(replyBytes);
                 Debug.Assert(reply != null);
 
                 if (reply.Ok)
                 {
-                    prepareCount++;
+                    promisedCount++;
                     if (reply.ProposalId > ProposalId)
                     {
                         ProposalId = reply.ProposalId;
@@ -60,8 +60,80 @@ internal class Proposer
                 continue;
             }
 
-            if (prepareCount >= Majority())
+            if (promisedCount >= Majority())
             {
+                break;
+            }
+        }
+
+        Int32 acceptedCount = 0;
+        if (promisedCount >= Majority())
+        {
+            Debug.Assert(Value != null, nameof(Value) + " != null");
+            var messagePropose = new MessagePropose(ProposalId, Id, Value.Value);
+            message = new Message(MessageType.Propose, messagePropose.Serialize());
+
+            foreach (var peerAddress in PeerAddresses)
+            {
+                NetworkDriver.SendTo(message, peerAddress);
+                var replyBytes = NetworkDriver.Receive();
+
+                try
+                {
+                    var reply = MessageAccepted.Deserialize(replyBytes);
+                    Debug.Assert(reply != null);
+
+                    if (reply.Ok)
+                    {
+                        acceptedCount++;
+                    }
+                }
+                catch (ArgumentException)
+                {
+                    continue;
+                }
+
+                if (acceptedCount >= Majority())
+                {
+                    break;
+                }
+            }
+
+            if (acceptedCount >= Majority())
+            {
+                return Value;
+            }
+        }
+
+        return new Int32?();
+    }
+
+    private void StartProposer()
+    {
+        var recverThread = new Thread(OnReceive)
+        {
+            IsBackground = true
+        };
+        recverThread.Start();
+    }
+
+    private void OnReceive()
+    {
+        var task = NetworkDriver.ReceiveAsync();
+        task.Wait();
+        var bytes = task.Result.Buffer;
+        var message = Message.Deserialize(bytes);
+
+        switch (message.Type)
+        {
+            case MessageType.Promise:
+            {
+                var prepare = MessagePromise.Deserialize(bytes);
+                break;
+            }
+            case MessageType.Accepted:
+            {
+                var proposal = MessageAccepted.Deserialize(bytes);
                 break;
             }
         }
