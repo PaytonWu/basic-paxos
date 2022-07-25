@@ -48,10 +48,12 @@ internal class Proposer
                 if (reply.Ok)
                 {
                     promisedCount++;
-                    if (reply.ProposalId > ProposalId)
+                    Debug.Assert(reply.Proposal != null, "reply.Proposal != null");
+
+                    if (reply.Proposal.Value.Id > ProposalId)
                     {
-                        ProposalId = reply.ProposalId;
-                        Value = reply.Value;
+                        ProposalId = reply.Proposal.Value.Id;
+                        Value = reply.Proposal.Value.Value;
                     }
                 }
             }

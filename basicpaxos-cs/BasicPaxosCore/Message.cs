@@ -7,21 +7,36 @@ public enum MessageType : Byte
 {
     Invalid = 0,
     Prepare,
-    Propose,
     Promise,
+    Propose,
     Accepted
 }
 
-// [Serializable]
 internal class Message
 {
     public Message(MessageType type, [DisallowNull] Byte[] payload)
     {
         Type = type;
+        Ok = true;
         Payload = payload;
     }
 
+    public Message(MessageType type, Boolean ok)
+    {
+        Type = type;
+        Ok = ok;
+        Payload = Array.Empty<Byte>();
+    }
+
+    public Message(MessageType type)
+    {
+        Type = type;
+        Payload = Array.Empty<Byte>();
+        Ok = false;
+    }
+
     public MessageType Type { get; }
+    public Boolean Ok { get; }
     public Byte[] Payload { get; }
 
     public Byte[] Serialize()
@@ -29,7 +44,11 @@ internal class Message
         var bytes = Array.Empty<Byte>();
 
         bytes.Concat(BitConverter.GetBytes((Byte)Type));
-        bytes.Concat(Payload);
+        bytes.Concat(BitConverter.GetBytes(Ok));
+        if (Ok)
+        {
+            bytes.Concat(Payload);
+        }
 
         return bytes.ToArray();
     }
@@ -42,9 +61,16 @@ internal class Message
         }
 
         var type = (MessageType)bytes[0];
-        var payload = bytes.Skip(0).Take(bytes.Length).ToArray();
+        var ok = bytes[1] != 0;
+        if (ok)
+        {
+            Debug.Assert(bytes.Length > 2);
 
-        return new Message(type, payload);
+            var payload = bytes.Skip(1).Take(bytes.Length).ToArray();
+            return new Message(type, payload);
+        }
+
+        return new Message(type);
     }
 }
 
@@ -120,31 +146,26 @@ class MessagePropose
 
 class MessagePromise
 {
-    public Boolean Ok { get; private set; }
-    public Int32 ProposalId { get; private set; }
-    public Int32? Value { get; private set; }
+    public AcceptedProposal? Proposal { get; private set; }
 
-    public MessagePromise(Boolean ok, Int32 proposalId, Int32 value)
+    public Boolean Ok => Proposal.HasValue;
+
+    public MessagePromise(AcceptedProposal proposal)
     {
-        Ok = ok;
-        ProposalId = proposalId;
-        Value = value;
+        Proposal = proposal;
     }
 
-    public MessagePromise(Boolean ok, Int32 proposalId)
+    public MessagePromise()
     {
-        Ok = ok;
-        ProposalId = proposalId;
     }
 
     internal Byte[] Serialize()
     {
         ICollection<Byte> bytes = new List<Byte>();
-        bytes.Concat(BitConverter.GetBytes(Ok));
-        bytes.Concat(BitConverter.GetBytes(ProposalId));
-        if (Value.HasValue)
+        if (Proposal.HasValue)
         {
-            bytes.Concat(BitConverter.GetBytes(Value.Value));
+            bytes.Concat(BitConverter.GetBytes(Proposal.Value.Id));
+            bytes.Concat(BitConverter.GetBytes(Proposal.Value.Value));
         }
 
         return bytes.ToArray();
@@ -152,18 +173,13 @@ class MessagePromise
 
     internal static MessagePromise Deserialize([DisallowNull] Byte[] bytes)
     {
-        if (bytes.Length < 5)
-        {
-            throw new ArgumentException("Input bytes too short");
-        }
-
         switch (bytes.Length)
         {
-            case 5:
-                return new MessagePromise(BitConverter.ToBoolean(bytes, 0), BitConverter.ToInt32(bytes, 1));
+            case 0:
+                return new MessagePromise();
 
-            case 9:
-                return new MessagePromise(BitConverter.ToBoolean(bytes, 0), BitConverter.ToInt32(bytes, 1), BitConverter.ToInt32(bytes, 5));
+            case 8:
+                return new MessagePromise(new AcceptedProposal(BitConverter.ToInt32(bytes, 0), BitConverter.ToInt32(bytes, 4)));
 
             default:
                 Debug.Assert(false);
@@ -175,53 +191,27 @@ class MessagePromise
 class MessageAccepted
 {
     public Boolean Ok { get; private set; }
-    public Int32 ProposalId { get; private set; }
-    public Int32? Value { get; private set; }
 
-    public MessageAccepted(Boolean ok, Int32 proposalId, Int32 value)
+    public MessageAccepted(Boolean ok)
     {
         Ok = ok;
-        ProposalId = proposalId;
-        Value = value;
-    }
-
-    public MessageAccepted(Boolean ok, Int32 proposalId)
-    {
-        Ok = ok;
-        ProposalId = proposalId;
     }
 
     internal Byte[] Serialize()
     {
         ICollection<Byte> bytes = new List<Byte>();
         bytes.Concat(BitConverter.GetBytes(Ok));
-        bytes.Concat(BitConverter.GetBytes(ProposalId));
-        if (Value.HasValue)
-        {
-            bytes.Concat(BitConverter.GetBytes(Value.Value));
-        }
 
         return bytes.ToArray();
     }
 
     internal static MessageAccepted Deserialize([DisallowNull] Byte[] bytes)
     {
-        if (bytes.Length < 5)
+        if (bytes.Length != 1)
         {
-            throw new ArgumentException("Input bytes too short");
+            throw new ArgumentException("Input bytes incorrect");
         }
 
-        switch (bytes.Length)
-        {
-            case 5:
-                return new MessageAccepted(BitConverter.ToBoolean(bytes, 0), BitConverter.ToInt32(bytes, 1));
-
-            case 9:
-                return new MessageAccepted(BitConverter.ToBoolean(bytes, 0), BitConverter.ToInt32(bytes, 1), BitConverter.ToInt32(bytes, 5));
-
-            default:
-                Debug.Assert(false);
-                throw new ArgumentException("Input bytes length invalid");
-        }
+        return new MessageAccepted(BitConverter.ToBoolean(bytes, 0));
     }
 }

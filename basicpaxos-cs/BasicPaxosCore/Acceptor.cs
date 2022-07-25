@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.Diagnostics;
 using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
@@ -7,6 +8,18 @@ using System.Net;
 using System.Threading;
 
 namespace BasicPaxosCore;
+
+public struct AcceptedProposal
+{
+    public AcceptedProposal(Int32 id, Int32 value)
+    {
+        Id = id;
+        Value = value;
+    }
+
+    public Int32 Id { get; }
+    public Int32 Value { get; }
+}
 
 internal class Acceptor
 {
@@ -19,8 +32,7 @@ internal class Acceptor
     private NetworkDriver NetworkDriver { get; set; }
     public Int32 Id { get; private set; }
     public Int32? MinProposalId { get; set; }
-    public Int32? AcceptedProposalId { get; set; }
-    public Int32? AcceptedValue { get; set; }
+    public AcceptedProposal? AcceptedProposal { get; set; }
 
     private void StartReceiver()
     {
@@ -36,45 +48,73 @@ internal class Acceptor
         var task = NetworkDriver.ReceiveAsync();
         task.Wait();
         var bytes = task.Result.Buffer;
+        var from = task.Result.RemoteEndPoint;
+
         var message = Message.Deserialize(bytes);
 
         switch (message.Type)
         {
             case MessageType.Prepare:
             {
-                var prepare = MessagePrepare.Deserialize(bytes);
-                OnPrepare(prepare);
+                var prepare = MessagePrepare.Deserialize(message.Payload);
+                OnPrepare(from.Address, prepare);
                 break;
             }
             case MessageType.Propose:
             {
-                var propose = MessagePropose.Deserialize(bytes);
-                OnPropose(propose);
+                var propose = MessagePropose.Deserialize(message.Payload);
+                OnPropose(from.Address, propose);
                 break;
             }
         }
     }
 
-    private void OnPrepare(MessagePrepare prepare)
+    private void OnPrepare(IPAddress from, MessagePrepare prepare)
     {
-        if (AcceptedProposalId.HasValue)
+        if (MinProposalId.HasValue)
         {
-            if (prepare.ProposalId <= AcceptedProposalId)
+            if (prepare.ProposalId > MinProposalId)
             {
-                var messagePromise = AcceptedValue.HasValue
-                    ? new MessagePromise(true, AcceptedProposalId.Value, AcceptedValue.Value)
-                    : new MessagePromise(true, AcceptedProposalId.Value);
-                // NetworkDriver.SendTo();
+                MinProposalId = prepare.ProposalId;
+
+                var messagePromise = AcceptedProposal.HasValue
+                    ? new MessagePromise(AcceptedProposal.Value)
+                    : new MessagePromise();
+                var message = new Message(MessageType.Promise, messagePromise.Serialize());
+                NetworkDriver.SendTo(message, from);
+            }
+            else
+            {
+                var message = new Message(MessageType.Promise);
+                NetworkDriver.SendTo(message, from);
             }
         }
         else
         {
             MinProposalId = prepare.ProposalId;
+
+            Debug.Assert(!AcceptedProposal.HasValue);
+
+            var message = new Message(MessageType.Promise);
+            NetworkDriver.SendTo(message, from);
         }
     }
 
-    private void OnPropose(MessagePropose propose)
+    private void OnPropose(IPAddress from, MessagePropose propose)
     {
+        if (!MinProposalId.HasValue || propose.ProposalId >= MinProposalId)
+        {
+            MinProposalId = propose.ProposalId;
+            AcceptedProposal = new AcceptedProposal(propose.ProposalId, propose.Value);
 
+            var messageAccepted = new MessageAccepted(true);
+            var message = new Message(MessageType.Accepted, messageAccepted.Serialize());
+            NetworkDriver.SendTo(message, from);
+        }
+        else
+        {
+            var message = new Message(MessageType.Accepted);
+            NetworkDriver.SendTo(message, from);
+        }
     }
 }
