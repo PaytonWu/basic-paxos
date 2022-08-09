@@ -45,7 +45,7 @@ internal class Proposer
                 var reply = MessagePromise.Deserialize(replyBytes);
                 Debug.Assert(reply != null);
 
-                if (reply.Ok)
+
                 {
                     promisedCount++;
                     Debug.Assert(reply.Proposal != null, "reply.Proposal != null");

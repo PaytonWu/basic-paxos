@@ -14,7 +14,7 @@ public enum MessageType : Byte
 
 internal class Message
 {
-    public Message(MessageType type, [DisallowNull] Byte[] payload)
+    public Message(MessageType type, Byte[] payload)
     {
         Type = type;
         Ok = true;
@@ -74,27 +74,27 @@ internal class Message
     }
 }
 
-class MessagePrepare
+public class MessagePrepare
 {
     public Int32 ProposalId { get; internal set; }
     public Int32 From { get; internal set; }
 
-    internal MessagePrepare(Int32 proposalId, Int32 from)
+    public MessagePrepare(Int32 proposalId, Int32 from)
     {
         ProposalId = proposalId;
         From = from;
     }
 
-    internal Byte[] Serialize()
+    public Byte[] Serialize()
     {
-        var bytes = Array.Empty<Byte>();
-        bytes.Concat(BitConverter.GetBytes(ProposalId));
-        bytes.Concat(BitConverter.GetBytes(From));
+        IEnumerable<Byte> bytes = Array.Empty<Byte>();
+        bytes = bytes.Concat(BitConverter.GetBytes(ProposalId));
+        bytes = bytes.Concat(BitConverter.GetBytes(From));
 
         return bytes.ToArray();
     }
 
-    internal static MessagePrepare Deserialize([DisallowNull] Byte[] bytes)
+    public static MessagePrepare Deserialize([DisallowNull] Byte[] bytes)
     {
         if (bytes.Length == 8)
         {
@@ -148,20 +148,23 @@ class MessagePromise
 {
     public AcceptedProposal? Proposal { get; private set; }
 
-    public Boolean Ok => Proposal.HasValue;
+    public Int32 PrepareId { get; private set; }
 
-    public MessagePromise(AcceptedProposal proposal)
+    public MessagePromise(Int32 prepareId, AcceptedProposal proposal)
     {
+        PrepareId = prepareId;
         Proposal = proposal;
     }
 
-    public MessagePromise()
+    public MessagePromise(Int32 prepareId)
     {
+        this.PrepareId = prepareId;
     }
 
     internal Byte[] Serialize()
     {
         ICollection<Byte> bytes = new List<Byte>();
+        bytes.Concat(BitConverter.GetBytes(PrepareId));
         if (Proposal.HasValue)
         {
             bytes.Concat(BitConverter.GetBytes(Proposal.Value.Id));
@@ -171,15 +174,16 @@ class MessagePromise
         return bytes.ToArray();
     }
 
-    internal static MessagePromise Deserialize([DisallowNull] Byte[] bytes)
+    internal static MessagePromise Deserialize(Byte[] bytes)
     {
         switch (bytes.Length)
         {
-            case 0:
-                return new MessagePromise();
+            case 4:
+                return new MessagePromise(BitConverter.ToInt32(bytes, 0));
 
-            case 8:
-                return new MessagePromise(new AcceptedProposal(BitConverter.ToInt32(bytes, 0), BitConverter.ToInt32(bytes, 4)));
+            case 12:
+                return new MessagePromise(BitConverter.ToInt32(bytes, 0),
+                    new AcceptedProposal(BitConverter.ToInt32(bytes, 4), BitConverter.ToInt32(bytes, 8)));
 
             default:
                 Debug.Assert(false);

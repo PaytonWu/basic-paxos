@@ -23,16 +23,16 @@ public struct AcceptedProposal
 
 internal class Acceptor
 {
+    private NetworkDriver NetworkDriver { get; set; }
+    public Int32 Id { get; private set; }
+    public Int32 MaxProposalId { get; set; }
+    public AcceptedProposal? AcceptedProposal { get; set; }
+
     public Acceptor(Int32 id, IPAddress ipAddress)
     {
         Id = id;
         NetworkDriver = new NetworkDriver(ipAddress);
     }
-
-    private NetworkDriver NetworkDriver { get; set; }
-    public Int32 Id { get; private set; }
-    public Int32? MinProposalId { get; set; }
-    public AcceptedProposal? AcceptedProposal { get; set; }
 
     private void StartReceiver()
     {
@@ -56,6 +56,8 @@ internal class Acceptor
         {
             case MessageType.Prepare:
             {
+                Debug.Assert(message.Ok);
+
                 var prepare = MessagePrepare.Deserialize(message.Payload);
                 OnPrepare(from.Address, prepare);
                 break;
@@ -71,40 +73,39 @@ internal class Acceptor
 
     private void OnPrepare(IPAddress from, MessagePrepare prepare)
     {
-        if (MinProposalId.HasValue)
-        {
-            if (prepare.ProposalId > MinProposalId)
-            {
-                MinProposalId = prepare.ProposalId;
 
-                var messagePromise = AcceptedProposal.HasValue
-                    ? new MessagePromise(AcceptedProposal.Value)
-                    : new MessagePromise();
-                var message = new Message(MessageType.Promise, messagePromise.Serialize());
-                NetworkDriver.SendTo(message, from);
-            }
-            else
-            {
-                var message = new Message(MessageType.Promise);
-                NetworkDriver.SendTo(message, from);
-            }
+        if (prepare.ProposalId > MaxProposalId)
+        {
+            MaxProposalId = prepare.ProposalId;
+
+            var messagePromise = AcceptedProposal.HasValue
+                ? new MessagePromise(prepare.ProposalId, AcceptedProposal.Value)
+                : new MessagePromise(prepare.ProposalId);
+            var message = new Message(MessageType.Promise, messagePromise.Serialize());
+            NetworkDriver.SendTo(message, from);
         }
         else
         {
-            MinProposalId = prepare.ProposalId;
-
-            Debug.Assert(!AcceptedProposal.HasValue);
-
             var message = new Message(MessageType.Promise);
             NetworkDriver.SendTo(message, from);
         }
+        //}
+        //else
+        //{
+        //    MaxProposalId = prepare.ProposalId;
+
+        //    Debug.Assert(!AcceptedProposal.HasValue);
+
+        //    var message = new Message(MessageType.Promise);
+        //    NetworkDriver.SendTo(message, from);
+        //}
     }
 
     private void OnPropose(IPAddress from, MessagePropose propose)
     {
-        if (!MinProposalId.HasValue || propose.ProposalId >= MinProposalId)
+        if (propose.ProposalId >= MaxProposalId)
         {
-            MinProposalId = propose.ProposalId;
+            MaxProposalId = propose.ProposalId;
             AcceptedProposal = new AcceptedProposal(propose.ProposalId, propose.Value);
 
             var messageAccepted = new MessageAccepted(true);
