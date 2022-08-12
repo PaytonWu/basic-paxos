@@ -23,6 +23,11 @@ internal class NetworkDriver
         _self.Send(message.Serialize(), new IPEndPoint(peer, ServiceNumber));
     }
 
+    public async ValueTask<Int32> SendToAsync(Message message, IPAddress peer)
+    {
+        return await _self.SendAsync(message.Serialize(), new IPEndPoint(peer, ServiceNumber));
+    }
+
     public Byte[] Receive()
     {
         IPEndPoint? remote = null;

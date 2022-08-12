@@ -27,7 +27,7 @@ internal class Proposer
         return PeerAddresses.Length / 2 + 1;
     }
 
-    Int32? Propose(Int32 value)
+    async Task<Int32?> Propose(Int32 value)
     {
         Round++;
         ProposalId = Round << 16 | Id;
@@ -37,35 +37,37 @@ internal class Proposer
         Int32 promisedCount = 0;
         foreach (var peerAddress in PeerAddresses)
         {
-            NetworkDriver.SendTo(message, peerAddress);
-            var replyBytes = NetworkDriver.Receive();
-
-            try
-            {
-                var reply = MessagePromise.Deserialize(replyBytes);
-                Debug.Assert(reply != null);
-
-
+            await NetworkDriver.SendToAsync(message, peerAddress).AsTask().ContinueWith(_ => NetworkDriver.ReceiveAsync(), TaskContinuationOptions.OnlyOnRanToCompletion).Unwrap().ContinueWith(
+                replyBytes =>
                 {
-                    promisedCount++;
-                    Debug.Assert(reply.Proposal != null, "reply.Proposal != null");
-
-                    if (reply.Proposal.Value.Id > ProposalId)
+                    var buffer = replyBytes.Result.Buffer;
+                    try
                     {
-                        ProposalId = reply.Proposal.Value.Id;
-                        Value = reply.Proposal.Value.Value;
-                    }
-                }
-            }
-            catch (ArgumentException)
-            {
-                continue;
-            }
+                        var reply = MessagePromise.Deserialize(buffer);
+                        Debug.Assert(reply != null);
 
-            if (promisedCount >= Majority())
-            {
-                break;
-            }
+
+                        {
+                            promisedCount++;
+                            Debug.Assert(reply.Proposal != null, "reply.Proposal != null");
+
+                            if (reply.Proposal.Value.Id > ProposalId)
+                            {
+                                ProposalId = reply.Proposal.Value.Id;
+                                Value = reply.Proposal.Value.Value;
+                            }
+                        }
+                    }
+                    catch (ArgumentException)
+                    {
+                        // continue;
+                    }
+
+                    if (promisedCount >= Majority())
+                    {
+                        // break;
+                    }
+                });
         }
 
         Int32 acceptedCount = 0;
