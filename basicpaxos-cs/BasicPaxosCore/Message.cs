@@ -106,7 +106,7 @@ public class MessagePrepare
     }
 }
 
-class MessagePropose
+public class MessagePropose
 {
     public Int32 ProposalId { get; internal set; }
     public Int32 From { get; private set; }
@@ -114,24 +114,24 @@ class MessagePropose
 
     public MessageType Type => MessageType.Propose;
 
-    internal MessagePropose(Int32 proposalId, Int32 from, Int32 value)
+    public MessagePropose(Int32 proposalId, Int32 from, Int32 value)
     {
         ProposalId = proposalId;
         From = from;
         Value = value;
     }
 
-    internal Byte[] Serialize()
+    public Byte[] Serialize()
     {
-        var bytes = Array.Empty<Byte>();
-        bytes.Concat(BitConverter.GetBytes(ProposalId));
-        bytes.Concat(BitConverter.GetBytes(From));
-        bytes.Concat(BitConverter.GetBytes(Value));
+        IEnumerable<Byte> bytes = Array.Empty<Byte>();
+        bytes = bytes.Concat(BitConverter.GetBytes(ProposalId));
+        bytes = bytes.Concat(BitConverter.GetBytes(From));
+        bytes = bytes.Concat(BitConverter.GetBytes(Value));
 
         return bytes.ToArray();
     }
 
-    internal static MessagePropose Deserialize([DisallowNull] Byte[] bytes)
+    public static MessagePropose Deserialize([DisallowNull] Byte[] bytes)
     {
         if (bytes.Length == 12)
         {
@@ -144,7 +144,7 @@ class MessagePropose
     }
 }
 
-class MessagePromise
+public class MessagePromise
 {
     public AcceptedProposal? Proposal { get; private set; }
 
@@ -161,20 +161,20 @@ class MessagePromise
         this.PrepareId = prepareId;
     }
 
-    internal Byte[] Serialize()
+    public Byte[] Serialize()
     {
-        ICollection<Byte> bytes = new List<Byte>();
-        bytes.Concat(BitConverter.GetBytes(PrepareId));
+        IEnumerable<Byte> bytes = Array.Empty<Byte>();
+        bytes = bytes.Concat(BitConverter.GetBytes(PrepareId));
         if (Proposal.HasValue)
         {
-            bytes.Concat(BitConverter.GetBytes(Proposal.Value.Id));
-            bytes.Concat(BitConverter.GetBytes(Proposal.Value.Value));
+            bytes = bytes.Concat(BitConverter.GetBytes(Proposal.Value.Id));
+            bytes = bytes.Concat(BitConverter.GetBytes(Proposal.Value.Value));
         }
 
         return bytes.ToArray();
     }
 
-    internal static MessagePromise Deserialize(Byte[] bytes)
+    public static MessagePromise Deserialize(Byte[] bytes)
     {
         switch (bytes.Length)
         {
@@ -192,7 +192,7 @@ class MessagePromise
     }
 }
 
-class MessageAccepted
+public class MessageAccepted
 {
     public Boolean Ok { get; private set; }
 
@@ -201,15 +201,15 @@ class MessageAccepted
         Ok = ok;
     }
 
-    internal Byte[] Serialize()
+    public Byte[] Serialize()
     {
-        ICollection<Byte> bytes = new List<Byte>();
-        bytes.Concat(BitConverter.GetBytes(Ok));
+        IEnumerable<Byte> bytes = Array.Empty<Byte>();
+        bytes = bytes.Concat(BitConverter.GetBytes(Ok));
 
         return bytes.ToArray();
     }
 
-    internal static MessageAccepted Deserialize([DisallowNull] Byte[] bytes)
+    public static MessageAccepted Deserialize([DisallowNull] Byte[] bytes)
     {
         if (bytes.Length != 1)
         {
