@@ -43,8 +43,14 @@ internal class Proposer
                     var buffer = replyBytes.Result.Buffer;
                     try
                     {
-                        var reply = MessagePromise.Deserialize(buffer);
-                        Debug.Assert(reply != null);
+                        var replyMessage = Message.Deserialize(buffer);
+                        Debug.Assert(replyMessage != null);
+                        if (replyMessage.Type != MessageType.Promise || !replyMessage.Ok)
+                        {
+                            return;
+                        }
+
+                        var reply = MessagePromise.Deserialize(replyMessage.Payload);
 
                         {
                             promisedCount++;

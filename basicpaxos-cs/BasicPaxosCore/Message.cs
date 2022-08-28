@@ -12,48 +12,41 @@ public enum MessageType : Byte
     Accepted
 }
 
-internal class Message
+public class Message
 {
     public Message(MessageType type, Byte[] payload)
     {
+        // Debug.Assert(payload != null);
         Type = type;
-        Ok = true;
         Payload = payload;
-    }
-
-    public Message(MessageType type, Boolean ok)
-    {
-        Type = type;
-        Ok = ok;
-        Payload = Array.Empty<Byte>();
     }
 
     public Message(MessageType type)
     {
         Type = type;
-        Payload = Array.Empty<Byte>();
-        Ok = false;
     }
 
     public MessageType Type { get; }
-    public Boolean Ok { get; }
+    [AllowNull]
     public Byte[] Payload { get; }
+    public Boolean Ok => Payload != null;
 
     public Byte[] Serialize()
     {
-        var bytes = Array.Empty<Byte>();
+        IEnumerable<Byte> bytes = Array.Empty<Byte>();
+        Debug.Assert(!bytes.Any());
 
-        bytes.Concat(BitConverter.GetBytes((Byte)Type));
-        bytes.Concat(BitConverter.GetBytes(Ok));
+        bytes = bytes.Concat(BitConverter.GetBytes((Byte)Type));
+        bytes = bytes.Concat(BitConverter.GetBytes(Ok));
         if (Ok)
         {
-            bytes.Concat(Payload);
+            bytes = bytes.Concat(Payload);
         }
 
         return bytes.ToArray();
     }
 
-    public static Message Deserialize([DisallowNull] Byte[] bytes)
+    public static Message Deserialize(Byte[] bytes)
     {
         if (bytes.Length < 2)
         {
@@ -66,7 +59,7 @@ internal class Message
         {
             Debug.Assert(bytes.Length > 2);
 
-            var payload = bytes.Skip(1).Take(bytes.Length).ToArray();
+            var payload = bytes.Skip(2).Take(bytes.Length).ToArray();
             return new Message(type, payload);
         }
 

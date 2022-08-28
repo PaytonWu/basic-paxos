@@ -52,4 +52,37 @@ public class MessageTests
         Assert.AreEqual(origin.Proposal.Value.Value, deserialized.Proposal.Value.Value);
         Assert.AreEqual(origin.Proposal.Value.Id, deserialized.Proposal.Value.Id);
     }
+
+    [TestMethod]
+    public void MessageSerializationTest()
+    {
+        var origin = new Message(MessageType.Prepare);
+        var bytes = origin.Serialize();
+        Assert.IsNotNull(bytes);
+        var deserialized = Message.Deserialize(bytes);
+        Assert.IsNotNull(deserialized);
+        Assert.AreEqual(origin.Type, deserialized.Type);
+        Assert.AreEqual(origin.Ok, deserialized.Ok);
+        Assert.IsNull(origin.Payload);
+        Assert.IsNull(deserialized.Payload);
+
+        origin = new Message(MessageType.Prepare);
+        bytes = origin.Serialize();
+        Assert.IsNotNull(bytes);
+        deserialized = Message.Deserialize(bytes);
+        Assert.IsNotNull(deserialized);
+        Assert.AreEqual(origin.Type, deserialized.Type);
+        Assert.AreEqual(origin.Ok, deserialized.Ok);
+        Assert.IsNull(origin.Payload);
+        Assert.IsNull(deserialized.Payload);
+
+        origin = new Message(MessageType.Accepted, null);
+        bytes = origin.Serialize();
+        deserialized = Message.Deserialize(bytes);
+        Assert.IsNotNull(deserialized);
+        Assert.AreEqual(origin.Type, deserialized.Type);
+        Assert.AreEqual(origin.Ok, deserialized.Ok);
+        Assert.IsNull(origin.Payload);
+        Assert.IsNull(deserialized.Payload);
+    }
 }
