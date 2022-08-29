@@ -187,28 +187,19 @@ public class MessagePromise
 
 public class MessageAccepted
 {
-    public Boolean Ok { get; private set; }
-
-    public MessageAccepted(Boolean ok)
-    {
-        Ok = ok;
-    }
-
     public Byte[] Serialize()
     {
         IEnumerable<Byte> bytes = Array.Empty<Byte>();
-        bytes = bytes.Concat(BitConverter.GetBytes(Ok));
-
         return bytes.ToArray();
     }
 
     public static MessageAccepted Deserialize([DisallowNull] Byte[] bytes)
     {
-        if (bytes.Length != 1)
+        if (bytes.Length != 0)
         {
             throw new ArgumentException("Input bytes incorrect");
         }
 
-        return new MessageAccepted(BitConverter.ToBoolean(bytes, 0));
+        return new MessageAccepted();
     }
 }

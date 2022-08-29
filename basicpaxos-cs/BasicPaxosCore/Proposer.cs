@@ -27,94 +27,91 @@ internal class Proposer
         return PeerAddresses.Length / 2 + 1;
     }
 
-    async Task<Int32?> Propose(Int32 value)
+    Int32 Propose(Int32 value)
     {
         Round++;
         ProposalId = Round << 16 | Id;
 
         var messagePrepare = new MessagePrepare(ProposalId, Id);
         var message = new Message(MessageType.Prepare, messagePrepare.Serialize());
-        Int32 promisedCount = 0;
+        var promisedCount = 0;
         foreach (var peerAddress in PeerAddresses)
         {
-            await NetworkDriver.SendToAsync(message, peerAddress).AsTask().ContinueWith(_ => NetworkDriver.ReceiveAsync(), TaskContinuationOptions.OnlyOnRanToCompletion).Unwrap().ContinueWith(
-                replyBytes =>
-                {
-                    var buffer = replyBytes.Result.Buffer;
-                    try
-                    {
-                        var replyMessage = Message.Deserialize(buffer);
-                        Debug.Assert(replyMessage != null);
-                        if (replyMessage.Type != MessageType.Promise || !replyMessage.Ok)
-                        {
-                            return;
-                        }
-
-                        var reply = MessagePromise.Deserialize(replyMessage.Payload);
-
-                        {
-                            promisedCount++;
-                            Debug.Assert(reply.Proposal != null);
-
-                            if (reply.Proposal.Value.Id > ProposalId)
-                            {
-                                ProposalId = reply.Proposal.Value.Id;
-                                Value = reply.Proposal.Value.Value;
-                            }
-                        }
-                    }
-                    catch (ArgumentException)
-                    {
-                        // continue;
-                    }
-
-                    if (promisedCount >= Majority())
-                    {
-                        // break;
-                    }
-                });
-        }
-
-        Int32 acceptedCount = 0;
-        if (promisedCount >= Majority())
-        {
-            Debug.Assert(Value != null, nameof(Value) + " != null");
-            var messagePropose = new MessagePropose(ProposalId, Id, Value.Value);
-            message = new Message(MessageType.Propose, messagePropose.Serialize());
-
-            foreach (var peerAddress in PeerAddresses)
+            try
             {
                 NetworkDriver.SendTo(message, peerAddress);
-                var replyBytes = NetworkDriver.Receive();
-
-                try
-                {
-                    var reply = MessageAccepted.Deserialize(replyBytes);
-                    Debug.Assert(reply != null);
-
-                    if (reply.Ok)
-                    {
-                        acceptedCount++;
-                    }
-                }
-                catch (ArgumentException)
+                var bytes = NetworkDriver.Receive();
+                var replyMessage = Message.Deserialize(bytes);
+                Debug.Assert(replyMessage != null);
+                if (replyMessage.Type != MessageType.Promise || !replyMessage.Ok)
                 {
                     continue;
                 }
 
-                if (acceptedCount >= Majority())
+                var reply = MessagePromise.Deserialize(replyMessage.Payload);
+
                 {
-                    break;
+                    promisedCount++;
+                    Debug.Assert(reply.Proposal != null);
+                    var repliedProposal = reply.Proposal.Value;
+
+                    if (repliedProposal.Id > ProposalId)
+                    {
+                        ProposalId = repliedProposal.Id;
+                        Value = repliedProposal.Value;
+                    }
                 }
+            }
+            catch (ArgumentException)
+            {
+                continue;
+            }
+
+            if (promisedCount >= Majority())
+            {
+                break;
+            }
+        }
+
+        var acceptedCount = 0;
+        if (promisedCount < Majority())
+        {
+            return 0;
+        }
+
+        Debug.Assert(Value != null);
+        var proposedValue = Value.Value;
+
+        var messagePropose = new MessagePropose(ProposalId, Id, proposedValue);
+        message = new Message(MessageType.Propose, messagePropose.Serialize());
+
+        foreach (var peerAddress in PeerAddresses)
+        {
+            NetworkDriver.SendTo(message, peerAddress);
+            var bytes = NetworkDriver.Receive();
+
+            try
+            {
+                var replyMessage = Message.Deserialize(bytes);
+                if (replyMessage.Type != MessageType.Accepted || !replyMessage.Ok)
+                {
+                    continue;
+                }
+
+                acceptedCount++;
+            }
+            catch (ArgumentException)
+            {
+                continue;
             }
 
             if (acceptedCount >= Majority())
             {
-                return Value;
+                break;
             }
         }
 
-        return new Int32?();
+        return acceptedCount >= Majority() ? proposedValue : 0;
     }
 
     private void StartProposer()

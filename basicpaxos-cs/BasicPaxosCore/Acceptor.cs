@@ -1,11 +1,5 @@
-﻿using System;
-using System.Collections.Generic;
-using System.Diagnostics;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
+﻿using System.Diagnostics;
 using System.Net;
-using System.Threading;
 
 namespace BasicPaxosCore;
 
@@ -108,7 +102,7 @@ internal class Acceptor
             MaxProposalId = propose.ProposalId;
             AcceptedProposal = new AcceptedProposal(propose.ProposalId, propose.Value);
 
-            var messageAccepted = new MessageAccepted(true);
+            var messageAccepted = new MessageAccepted();
             var message = new Message(MessageType.Accepted, messageAccepted.Serialize());
             NetworkDriver.SendTo(message, from);
         }

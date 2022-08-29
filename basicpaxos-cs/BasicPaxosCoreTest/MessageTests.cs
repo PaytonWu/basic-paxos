@@ -76,7 +76,7 @@ public class MessageTests
         Assert.IsNull(origin.Payload);
         Assert.IsNull(deserialized.Payload);
 
-        origin = new Message(MessageType.Accepted, null);
+        origin = new Message(MessageType.Accepted, null!);
         bytes = origin.Serialize();
         deserialized = Message.Deserialize(bytes);
         Assert.IsNotNull(deserialized);
